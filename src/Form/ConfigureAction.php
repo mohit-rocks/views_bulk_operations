@@ -63,6 +63,8 @@ class ConfigureAction extends FormBase {
     $definition = $action_definitions[$action_id];
     $action = $this->getUnconfiguredAction($definition);
 
+    $form['#title'] = $this->t('Configure %action applied to the selection', ['%action' => $definition['label']]);
+
     $form += $action->buildConfigurationForm($form, $form_state);
 
     $form['action'] = [
