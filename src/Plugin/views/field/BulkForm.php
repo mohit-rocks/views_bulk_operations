@@ -408,10 +408,17 @@ class BulkForm extends FieldPluginBase implements CacheablePluginInterface {
         }
       }
       else {
-        $info = ['selected' => $selected, 'entity_type' => $this->getEntityType()];
+        $info = [
+          'selected' => $selected,
+          'entity_type' => $this->getEntityType(),
+        ];
+        $options = array(
+          'query' => $this->getDestinationArray(),
+        );
+
         $tempStore = $this->temp_store_factory->get($action_id);
         $tempStore->set($this->view->getUser()->id(), $info);
-        $form_state->setRedirect('views_bulk_operations.configure_action', array('action_id' => $action_id));
+        $form_state->setRedirect('views_bulk_operations.configure_action', array('action_id' => $action_id), $options);
       }
     }
   }
