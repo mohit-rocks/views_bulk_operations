@@ -47,20 +47,32 @@ class ViewsBulkOperationTest extends WebTestBase {
     $this->drupalPostForm('node/add/page', $edit, t('Save'));
   }
 
-  public function testBulkOperationOnConfigurableAction() {
-    $node_storage = $this->container->get('entity.manager')->getStorage('node');
-
+  public function X_testBulkOperationOnNonConfigurableAction() {
     $this->drupalGet('admin/config/system/actions');
 
     $option_value = Crypt::hashBase64('test_configurable_action');
     $this->assertOption('edit-action', $option_value);
 
+    $this->drupalPostForm(NULL, ['action' => $option_value], t('Create'));
+
+    $this->assertFieldByName('foo');
+
+    $foo = $this->randomMachineName(8);
+
+    $this->drupalPostForm(NULL, ['foo' => $foo, 'id' => strtolower($foo)], t('Save'));
+
+    $this->assertOption('edit-action', strtolower($foo));
+  }
+
+  public function testBulkOperationOnConfigurableAction() {
+    $node_storage = $this->container->get('entity.manager')->getStorage('node');
+
     $this->drupalGet('vbo-test');
 
-    $this->assertOption('edit-action', 'test_configurable_action');
+    $this->assertOption('edit-action', '#test_configurable_action');
 
     $edit["vbo_node_bulk_form[0]"] = 'en-1';
-    $edit["action"] = 'test_configurable_action';
+    $edit["action"] = '#test_configurable_action';
 
     $this->drupalPostForm(NULL, $edit, t('Apply'));
     $this->assertFieldByName('foo');

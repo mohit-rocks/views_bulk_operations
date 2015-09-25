@@ -352,7 +352,9 @@ class BulkForm extends FieldPluginBase implements CacheablePluginInterface {
 
     // Append configurable actions to the options.
     foreach ($this->configurable_actions as $id => $definition) {
-      $options[$id] = $definition['label'] . '...';
+      // # is not allowd as an entitiy machine name, this way we will
+      // detect configurabel actions and avoid conflicts.
+      $options["#" . $id] = $definition['label'] . '...';
     }
 
     return $options;
@@ -376,7 +378,24 @@ class BulkForm extends FieldPluginBase implements CacheablePluginInterface {
       $entities = array();
       $action_id = $form_state->getValue('action');
 
-      if (isset($this->actions[$action_id])) {
+      // Configurable action
+      if (preg_match('/^#/', $action_id)) {
+        $action_id = preg_replace('/#/', '', $action_id);
+
+        $info = [
+          'selected' => $selected,
+          'entity_type' => $this->getEntityType(),
+        ];
+        $options = array(
+          'query' => $this->getDestinationArray(),
+        );
+
+        $tempStore = $this->temp_store_factory->get($action_id);
+        $tempStore->set($this->view->getUser()->id(), $info);
+        $form_state->setRedirect('views_bulk_operations.configure_action', array('action_id' => $action_id), $options);
+      }
+      // Non-configurable action
+      elseif (isset($this->actions[$action_id])) {
         foreach ($selected as $bulk_form_key) {
           $storage = $this->entityManager->getStorage($this->getEntityType());
           $entity = self::loadEntityFromBulkFormKey($bulk_form_key, $storage);
@@ -406,19 +425,6 @@ class BulkForm extends FieldPluginBase implements CacheablePluginInterface {
             )));
           }
         }
-      }
-      else {
-        $info = [
-          'selected' => $selected,
-          'entity_type' => $this->getEntityType(),
-        ];
-        $options = array(
-          'query' => $this->getDestinationArray(),
-        );
-
-        $tempStore = $this->temp_store_factory->get($action_id);
-        $tempStore->set($this->view->getUser()->id(), $info);
-        $form_state->setRedirect('views_bulk_operations.configure_action', array('action_id' => $action_id), $options);
       }
     }
   }
