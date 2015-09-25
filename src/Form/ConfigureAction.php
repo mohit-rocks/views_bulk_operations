@@ -58,7 +58,6 @@ class ConfigureAction extends FormBase {
    * {@inheritdoc}
    */
   public function buildForm(array $form, FormStateInterface $form_state, $action_id = NULL) {
-
     $action_definitions = $this->actionManager->getDefinitions();
     $definition = $action_definitions[$action_id];
     $action = $this->getUnconfiguredAction($definition);
@@ -116,8 +115,9 @@ class ConfigureAction extends FormBase {
    * Return an unconfigured instance of an action with the given id.
    */
   function getUnconfiguredAction($definition) {
-    // Some action have a create function, some have not ... let's cope with it
-    if (method_exists($definition['class'], 'create')) {
+    $implemented_interfaces = class_implements($definition['class']);
+
+    if (isset($implemented_interfaces['Drupal\Core\Plugin\ContainerFactoryPluginInterface'])) {
       $action = forward_static_call_array([$definition['class'], 'create'], [$this->container, [], $definition['id'], $definition]);
     }
     else {
