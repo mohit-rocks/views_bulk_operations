@@ -63,7 +63,6 @@ class ViewsBulkOperationTest extends WebTestBase {
     $this->drupalPostForm('node/add/page', $edit, t('Save and publish'));
 
     $this->node_storage = $this->container->get('entity.manager')->getStorage('node');
-
   }
 
   public function testBulkOperationOnNonConfigurableAction() {
@@ -111,5 +110,11 @@ class ViewsBulkOperationTest extends WebTestBase {
     $this->assertTrue(preg_match("/^$title_prefix - /", $title), 'The node was prefixed with the prefix');
 
     $this->assertUrl('vbo-test', [], "We are redirected to the views page.");
+  }
+
+  public function testSelectAll() {
+    $this->drupalGet('vbo-test');
+
+    $this->assertFieldById('edit-this-page');
   }
 }

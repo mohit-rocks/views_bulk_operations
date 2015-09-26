@@ -319,6 +319,8 @@ class BulkForm extends FieldPluginBase implements CacheablePluginInterface {
       // Remove the default actions build array.
       unset($form['actions']);
     }
+
+    $form['header'] += $this->selectAllForm();
   }
 
   /**
@@ -549,5 +551,45 @@ class BulkForm extends FieldPluginBase implements CacheablePluginInterface {
     }
 
     return $entities;
+  }
+
+  /**
+   * Return form configuration for the select all checkboxes.
+   *
+   * @param bool $enable_select_all_pages
+   *   whether to display the select all pages option.
+
+   * @return array $form
+   */
+  protected function selectAllForm($enable_select_all_pages = FALSE) {
+    $form = array();
+
+    $form['#attached']['library'][] = 'views_bulk_operations/vbo.selectAll';
+
+    $form['select_all'] = array(
+      '#type' => 'fieldset',
+      '#attributes' => array('class' => array('vbo-fieldset-select-all')),
+    );
+    $form['select_all']['this_page'] = array(
+      '#type' => 'checkbox',
+      '#title' => t('Select all items on this page'),
+      '#default_value' => '',
+      '#attributes' => array('class' => array('vbo-select-this-page')),
+    );
+
+    if ($enable_select_all_pages) {
+      $form['select_all']['or'] = array(
+        '#type' => 'markup',
+        '#markup' => '<em>' . t('OR') . '</em>',
+      );
+      $form['select_all']['all_pages'] = array(
+        '#type' => 'checkbox',
+        '#title' => t('Select all items on all pages'),
+        '#default_value' => '',
+        '#attributes' => array('class' => array('vbo-select-all-pages')),
+      );
+    }
+
+    return $form;
   }
 }
