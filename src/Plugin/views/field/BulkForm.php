@@ -404,9 +404,9 @@ class BulkForm extends FieldPluginBase implements CacheablePluginInterface {
 
         $action = $this->actions[$action_id];
 
-        $entities = $this->filterEntitiesByActionAccess($entities, $action, $this->view->getUser());
+        $entities = $this->filterEntitiesByActionAccess($entities, $action->getPlugin(), $this->view->getUser());
 
-        $action->executeMultiple($entities);
+        $action->execute($entities);
 
         $operation_definition = $action->getPluginDefinition();
         if (!empty($operation_definition['confirm_form_route_name'])) {
@@ -535,12 +535,12 @@ class BulkForm extends FieldPluginBase implements CacheablePluginInterface {
     return $entity;
   }
 
-  public static function filterEntitiesByActionAccess($entities, $action, $user) {
+  public static function filterEntitiesByActionAccess($entities, $plugin, $user) {
     foreach ($entities as $key => $entity) {
       // Skip execution if the user did not have access.
-      if (!$action->access($entity, $user)) {
-        drupalSetMessage(t('No access to execute %action on the @entity_type_label %entity_label.', [
-          '%action' => $action->label(),
+      if (!$plugin->access($entity, $user)) {
+        drupal_set_message(t('No access to execute %action on the @entity_type_label %entity_label.', [
+          '%action' => $plugin->pluginDefinition['label'],
           '@entity_type_label' => $entity->getEntityType()->getLabel(),
           '%entity_label' => $entity->label()
         ]), 'error');

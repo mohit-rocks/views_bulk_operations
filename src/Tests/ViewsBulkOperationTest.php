@@ -23,6 +23,13 @@ class ViewsBulkOperationTest extends WebTestBase {
    */
   public static $modules = array('node', 'views', 'views_ui', 'action', 'views_bulk_operations', 'vbo_configurable_action_test');
 
+  /**
+   * The node storage.
+   *
+   * @var \Drupal\Core\Entity\EntityStorageInterface
+   */
+  protected $node_storage;
+
   protected function setUp() {
     parent::setUp();
 
@@ -35,7 +42,16 @@ class ViewsBulkOperationTest extends WebTestBase {
       $this->drupalCreateContentType(array('type' => 'article', 'name' => 'Article'));
     }
 
-    $this->adminUser = $this->drupalCreateUser(array('administer actions', 'administer views', 'create page content'));
+    $permissions = [
+      'administer actions',
+      'administer views',
+      'create page content',
+      'access content',
+      'edit any page content',
+      'administer nodes',
+      'administer content types',
+    ];
+    $this->adminUser = $this->drupalCreateUser($permissions);
     $this->drupalLogin($this->adminUser);
 
     $title_key = 'title[0][value]';
@@ -44,28 +60,36 @@ class ViewsBulkOperationTest extends WebTestBase {
     $edit = array();
     $edit[$title_key] = $this->randomMachineName(8);
     $edit[$body_key] = $this->randomMachineName(16);
-    $this->drupalPostForm('node/add/page', $edit, t('Save'));
+    $this->drupalPostForm('node/add/page', $edit, t('Save and publish'));
+
+    $this->node_storage = $this->container->get('entity.manager')->getStorage('node');
+
   }
 
-  public function X_testBulkOperationOnNonConfigurableAction() {
-    $this->drupalGet('admin/config/system/actions');
+  public function testBulkOperationOnNonConfigurableAction() {
+    $this->drupalGet('vbo-test');
 
-    $option_value = Crypt::hashBase64('test_configurable_action');
-    $this->assertOption('edit-action', $option_value);
+    $this->node_storage->resetCache(array(1));
+    $node = $this->node_storage->load(1);
 
-    $this->drupalPostForm(NULL, ['action' => $option_value], t('Create'));
+    $this->assertTrue(NODE_NOT_STICKY == $node->sticky->value);
 
-    $this->assertFieldByName('foo');
+    $this->assertOption('edit-action', 'node_make_sticky_action');
 
-    $foo = $this->randomMachineName(8);
+    $edit["vbo_node_bulk_form[0]"] = 'en-1';
+    $edit["action"] = 'node_make_sticky_action';
 
-    $this->drupalPostForm(NULL, ['foo' => $foo, 'id' => strtolower($foo)], t('Save'));
+    $this->drupalPostForm(NULL, $edit, t('Apply'));
 
-    $this->assertOption('edit-action', strtolower($foo));
+    $this->node_storage->resetCache(array(1));
+    $node = $this->node_storage->load(1);
+
+    $this->assertTrue(NODE_STICKY == $node->sticky->value);
+
+    $this->assertUrl('vbo-test', [], "We are redirected to the views page.");
   }
 
   public function testBulkOperationOnConfigurableAction() {
-    $node_storage = $this->container->get('entity.manager')->getStorage('node');
 
     $this->drupalGet('vbo-test');
 
@@ -80,11 +104,12 @@ class ViewsBulkOperationTest extends WebTestBase {
     $title_prefix = $this->randomMachineName(8);
     $this->drupalPostForm(NULL, ['foo' => $title_prefix], t('Apply'));
 
-    $node = $node_storage->load(1);
+    $this->node_storage->resetCache(array(1));
+    $node = $this->node_storage->load(1);
     $title = $node->label();
 
     $this->assertTrue(preg_match("/^$title_prefix - /", $title), 'The node was prefixed with the prefix');
 
-    $this->assertUrl('vbo-test', [], "Test if we have been redirected to the views page." );
+    $this->assertUrl('vbo-test', [], "We are redirected to the views page.");
   }
 }

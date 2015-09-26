@@ -94,8 +94,8 @@ class ConfigureAction extends FormBase {
 
     $action_definitions = $this->actionManager->getDefinitions();
     $definition = $action_definitions[$action_id];
-    $action = $this->getUnconfiguredAction($definition);
-    $action->submitConfigurationForm($form, $form_state);
+    $action_plugin = $this->getUnconfiguredAction($definition);
+    $action_plugin->submitConfigurationForm($form, $form_state);
 
     $storage = $this->entityManager->getStorage($info['entity_type']);
 
@@ -105,9 +105,9 @@ class ConfigureAction extends FormBase {
       $entities[$bulk_form_key] = $entity;
     }
 
-    $entities = BulkForm::filterEntitiesByActionAccess($entities, $action, $user);
+    $entities = BulkForm::filterEntitiesByActionAccess($entities, $action_plugin, $user);
 
-    $action->executeMultiple($entities);
+    $action_plugin->executeMultiple($entities);
   }
 
 
