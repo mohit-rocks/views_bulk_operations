@@ -1,0 +1,11 @@
+# Port of VBO to Drupal 8
+
+A 'light' version of views bulk operations was implemented with views in core. This aims to provide the missing functionality:
+
+- Bulk operations applying configurable actions
+- Select all items on this and on all pages.
+- Batch processing
+
+This is work in progress.
+
+This is not ready for production.
