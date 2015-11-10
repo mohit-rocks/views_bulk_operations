@@ -9,6 +9,7 @@
 namespace Drupal\views_bulk_operations\Plugin\views\field;
 
 use Drupal\Core\Action\ActionManager;
+use Drupal\Core\Cache\Cache;
 use Drupal\Core\Entity\EntityInterface;
 use Drupal\Core\Entity\EntityManagerInterface;
 use Drupal\Core\Entity\RevisionableInterface;
@@ -148,7 +149,7 @@ class BulkForm extends FieldPluginBase implements CacheableDependencyInterface {
   public function getCacheTags() {
    return [];
   }
-  
+
   /**
    * {@inheritdoc}
    */
@@ -196,6 +197,9 @@ class BulkForm extends FieldPluginBase implements CacheableDependencyInterface {
     $options['selected_actions'] = array(
       'default' => array(),
     );
+    $options['batching'] = array(
+      'default' => FALSE,
+    );
     return $options;
   }
 
@@ -226,6 +230,13 @@ class BulkForm extends FieldPluginBase implements CacheableDependencyInterface {
       '#default_value' => $this->options['selected_actions'],
     );
 
+    $form['batching'] = array(
+      '#type' => 'checkboxes',
+      '#title' => $this->t('Batching'),
+      '#options' => array('use_batching' => $this->t('Use batching')),
+      '#default_value' => $this->options['batching'],
+    );
+
     parent::buildOptionsForm($form, $form_state);
   }
 
@@ -237,6 +248,9 @@ class BulkForm extends FieldPluginBase implements CacheableDependencyInterface {
 
     $selected_actions = $form_state->getValue(array('options', 'selected_actions'));
     $form_state->setValue(array('options', 'selected_actions'), array_values(array_filter($selected_actions)));
+
+    $selected_batching = $form_state->getValue(array('options', 'batching'));
+    $form_state->setValue(array('options', 'batching'), array_values(array_filter($selected_batching)));
   }
 
   /**
@@ -403,13 +417,24 @@ class BulkForm extends FieldPluginBase implements CacheableDependencyInterface {
       }
       // Non-configurable action
       elseif (isset($this->actions[$action_id])) {
+        $action = $this->actions[$action_id];
+
+        if (in_array('use_batching', $this->options['batching'])) {
+          $batch_operations = $this->prepareBatchOperations($action_id, $selected);
+          $batch = array(
+            'title' => t('Apply action %label to selected items', array('%label' => $action->label())),
+            'operations' => $batch_operations,
+          );
+          batch_set($batch);
+
+          return;
+        }
+
         foreach ($selected as $bulk_form_key) {
           $storage = $this->entityManager->getStorage($this->getEntityType());
           $entity = self::loadEntityFromBulkFormKey($bulk_form_key, $storage);
           $entities[$bulk_form_key] = $entity;
         }
-
-        $action = $this->actions[$action_id];
 
         $entities = $this->filterEntitiesByActionAccess($entities, $action->getPlugin(), $this->view->getUser());
 
@@ -597,4 +622,62 @@ class BulkForm extends FieldPluginBase implements CacheableDependencyInterface {
 
     return $form;
   }
+
+  protected function prepareBatchOperations($action_id, $selected) {
+    $operations = array();
+
+    $user_id = \Drupal::currentUser()->id();
+
+    foreach ($selected as $bulk_form_key) {
+
+      $key_parts = explode('-', $bulk_form_key);
+      $revision_id = NULL;
+
+      // If there are 3 items, vid will be last.
+      if (count($key_parts) === 3) {
+        $revision_id = array_pop($key_parts);
+      }
+
+      // The first two items will always be langcode and ID.
+      $id = array_pop($key_parts);
+      $langcode = array_pop($key_parts);
+
+      $operations[] = array(array(__CLASS__, 'batchOperation'), array($action_id, $id, $revision_id, $langcode, $user_id));
+      break;
+    }
+
+    return $operations;
+  }
+
+  public static function batchOperation($action_id, $id, $revision_id, $langcode, $user_id) {
+    $entityManager = \Drupal::getContainer()->get('entity.manager');
+
+    $actionStorage = $entityManager->getStorage('action');
+    $action = $actionStorage->load($action_id);
+
+    $entityType = $action->getType();
+    $entityStorage = $entityManager->getStorage($entityType);
+
+    $entity = $revision_id ? $entityStorage->loadRevision($revision_id) : $entityStorage->load($id);
+
+    if ($entity instanceof TranslatableInterface) {
+      $entity = $entity->getTranslation($langcode);
+    }
+
+    $user = $entityManager->getStorage('user')->load($user_id);
+
+    $plugin = $action->getPlugin();
+    if (!$plugin->access($entity, $user)) {
+      drupal_set_message(t('No access to execute %action on the @entity_type_label %entity_label.', [
+        '%action' => $plugin->pluginDefinition['label'],
+        '@entity_type_label' => $entity->getEntityType()->getLabel(),
+        '%entity_label' => $entity->label()
+      ]), 'error');
+      return;
+    }
+
+    $action->execute(array($entity));
+  }
 }
+
+
