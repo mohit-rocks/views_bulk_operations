@@ -17,7 +17,10 @@
   Drupal.selectAll = function () {
     // Keep track of the table, which checkbox is checked and alias the
     // settings.
-    var checkboxes = $(this).find('.views-row input[type="checkbox"]');
+
+    // @TODO: just finding all checkboxes is way to inaccurate but will do for
+    // starters
+    var checkboxes = $(this).find('input[type="checkbox"]');
     var $selectAll = $('#edit-this-page');
     var $selectAllLabel = $('label[for=edit-this-page]');
     var strings = {
