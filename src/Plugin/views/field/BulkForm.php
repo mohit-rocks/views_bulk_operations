@@ -18,7 +18,7 @@ use Drupal\Core\Routing\RedirectDestinationTrait;
 use Drupal\Core\TypedData\TranslatableInterface;
 use Drupal\user\PrivateTempStoreFactory;
 use Drupal\views\Entity\Render\EntityTranslationRenderTrait;
-use Drupal\views\Plugin\CacheablePluginInterface;
+use Drupal\Core\Cache\CacheableDependencyInterface;
 use Drupal\views\Plugin\views\display\DisplayPluginBase;
 use Drupal\views\Plugin\views\field\FieldPluginBase;
 use Drupal\views\Plugin\views\field\UncacheableFieldHandlerTrait;
@@ -32,7 +32,7 @@ use Symfony\Component\DependencyInjection\ContainerInterface;
  *
  * @ViewsField("vbo_bulk_form")
  */
-class BulkForm extends FieldPluginBase implements CacheablePluginInterface {
+class BulkForm extends FieldPluginBase implements CacheableDependencyInterface {
 
   use RedirectDestinationTrait;
   use UncacheableFieldHandlerTrait;
@@ -138,12 +138,17 @@ class BulkForm extends FieldPluginBase implements CacheablePluginInterface {
   /**
    * {@inheritdoc}
    */
-  public function isCacheable() {
-    // @todo Consider making the bulk operation form cacheable. See
-    //   https://www.drupal.org/node/2503009.
-    return FALSE;
+  public function getCacheMaxAge() {
+    return Cache::PERMANENT;
   }
 
+  /**
+   * {@inheritdoc}
+   */
+  public function getCacheTags() {
+   return [];
+  }
+  
   /**
    * {@inheritdoc}
    */
