@@ -347,7 +347,10 @@ class BulkForm extends FieldPluginBase implements CacheableDependencyInterface {
       $enable_all_pages = true;
     }
     */
-    $form['header'] += $this->selectAllForm($enable_all_pages);
+    // $form['header'] might be empty e.g. for empty results.
+    if (is_array($form['header'])) {
+      $form['header'] += $this->selectAllForm($enable_all_pages);
+    }
   }
 
   /**
