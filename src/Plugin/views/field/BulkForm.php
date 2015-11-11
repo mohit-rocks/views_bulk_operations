@@ -339,7 +339,15 @@ class BulkForm extends FieldPluginBase implements CacheableDependencyInterface {
       unset($form['actions']);
     }
 
-    $form['header'] += $this->selectAllForm();
+    $enable_all_pages = FALSE;
+
+    /* TODO: Make batch on all results work and enable the checkbox.
+    $pager = $this->view->getPager();
+    if ($pager && $pager->getTotalItems() > $pager->getItemsPerPage()) {
+      $enable_all_pages = true;
+    }
+    */
+    $form['header'] += $this->selectAllForm($enable_all_pages);
   }
 
   /**
