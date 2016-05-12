@@ -341,12 +341,12 @@ class BulkForm extends FieldPluginBase implements CacheableDependencyInterface {
 
     $enable_all_pages = FALSE;
 
-    /* TODO: Make batch on all results work and enable the checkbox.
+    /* TODO: Make batch on all results work and enable the checkbox.*/
     $pager = $this->view->getPager();
     if ($pager && $pager->getTotalItems() > $pager->getItemsPerPage()) {
       $enable_all_pages = true;
     }
-    */
+
     // $form['header'] might be empty e.g. for empty results.
     if (is_array($form['header'])) {
       $form['header'] += $this->selectAllForm($enable_all_pages);
@@ -429,9 +429,15 @@ class BulkForm extends FieldPluginBase implements CacheableDependencyInterface {
       // Non-configurable action
       elseif (isset($this->actions[$action_id])) {
         $action = $this->actions[$action_id];
-
+        $all_pages = $form_state->getValue('all_pages');
         if (in_array('use_batching', $this->options['batching'])) {
-          $batch_operations = $this->prepareBatchOperations($action_id, $selected);
+          $batch_operations = $this->prepareBatchOperations($action_id, $selected, $all_pages);
+          if ($all_pages) {
+              $total_rows = $this->view->total_rows;
+              $batch['operations'][] = array(
+                'views_bulk_operations_adjust_selection', array($action_id),
+              );
+          }
           $batch = array(
             'title' => t('Apply action %label to selected items', array('%label' => $action->label())),
             'operations' => $batch_operations,
@@ -634,7 +640,7 @@ class BulkForm extends FieldPluginBase implements CacheableDependencyInterface {
     return $form;
   }
 
-  protected function prepareBatchOperations($action_id, $selected) {
+  protected function prepareBatchOperations($action_id, $selected, $all_pages) {
     $operations = array();
 
     $user_id = \Drupal::currentUser()->id();
@@ -688,6 +694,63 @@ class BulkForm extends FieldPluginBase implements CacheableDependencyInterface {
     }
 
     $action->execute(array($entity));
+  }
+
+  /**
+   * Batch API callback: loads the view page by page and enqueues all items.
+   *
+   * @param $queue_name
+   *   The name of the queue to which the items should be added.
+   * @param $operation
+   *   The operation object.
+   * @param $options
+   *   An array of options that affect execution (revision, entity_load_capacity,
+   *   view_info). Passed along with each new queue item.
+   */
+  public function views_bulk_operations_adjust_selection($action_id) {
+    if (!isset($context['sandbox']['progress'])) {
+      $context['sandbox']['progress'] = 0;
+      $context['sandbox']['max'] = 0;
+    }
+    /** @var \Drupal\views\ViewExecutable $view */
+    $view = $this->view;
+    // Note the total number of rows.
+    if (empty($context['sandbox']['max'])) {
+      $context['sandbox']['max'] = $view->total_rows;
+    }
+
+    $rows = array();
+    foreach ($view->result as $row_index => $result) {
+      $rows[$row_index] = array(
+        'entity_id' => $vbo->get_value($result),
+        'views_row' => array(),
+        'position' => array(
+          'current' => ++$context['sandbox']['progress'],
+          'total' => $context['sandbox']['max'],
+        ),
+      );
+      // Some operations require full selected rows.
+      /*if ($operation->needsRows()) {
+        $rows[$row_index]['views_row'] = $result;
+      }*/
+    }
+
+    // Enqueue the gathered rows.
+    //views_bulk_operations_enqueue_rows($queue_name, $rows, $operation, $options);
+
+    /*if ($context['sandbox']['progress'] != $context['sandbox']['max']) {
+      // Provide an estimation of the completion level we've reached.
+      $context['finished'] = $context['sandbox']['progress'] / $context['sandbox']['max'];
+      $context['message'] = t('Prepared @current out of @total', array('@current' => $context['sandbox']['progress'], '@total' => $context['sandbox']['max']));
+    }
+    else {
+      // Provide a status message to the user if this is the last batch job.
+      if ($operation->getAdminOption('postpone_processing')) {
+        $context['results']['log'][] = t('Enqueued the selected operation (%operation).', array(
+          '%operation' => $operation->label(),
+        ));
+      }
+    }*/
   }
 }
 
