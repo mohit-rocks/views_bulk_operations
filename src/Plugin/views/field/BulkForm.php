@@ -341,12 +341,12 @@ class BulkForm extends FieldPluginBase implements CacheableDependencyInterface {
 
     $enable_all_pages = FALSE;
 
-    /* TODO: Make batch on all results work and enable the checkbox.
+    /* TODO: Make batch on all results work and enable the checkbox.*/
     $pager = $this->view->getPager();
     if ($pager && $pager->getTotalItems() > $pager->getItemsPerPage()) {
       $enable_all_pages = true;
     }
-    */
+
     // $form['header'] might be empty e.g. for empty results.
     if (is_array($form['header'])) {
       $form['header'] += $this->selectAllForm($enable_all_pages);
@@ -429,9 +429,16 @@ class BulkForm extends FieldPluginBase implements CacheableDependencyInterface {
       // Non-configurable action
       elseif (isset($this->actions[$action_id])) {
         $action = $this->actions[$action_id];
-
+        $all_pages = $form_state->getValue('all_pages');
         if (in_array('use_batching', $this->options['batching'])) {
-          $batch_operations = $this->prepareBatchOperations($action_id, $selected);
+          $batch_operations = $this->prepareBatchOperations($action_id, $selected, $all_pages);
+          if ($all_pages) {
+              $total_rows = $this->view->total_rows;
+              /*$batch['operations'][] = array(
+                'views_bulk_operations_adjust_selection', array($action_id),
+              );*/
+              $batch_operations = $this->views_bulk_operations_adjust_selection($action_id, $all_pages);
+          }
           $batch = array(
             'title' => t('Apply action %label to selected items', array('%label' => $action->label())),
             'operations' => $batch_operations,
@@ -634,7 +641,7 @@ class BulkForm extends FieldPluginBase implements CacheableDependencyInterface {
     return $form;
   }
 
-  protected function prepareBatchOperations($action_id, $selected) {
+  protected function prepareBatchOperations($action_id, $selected, $all_pages) {
     $operations = array();
 
     $user_id = \Drupal::currentUser()->id();
@@ -688,6 +695,46 @@ class BulkForm extends FieldPluginBase implements CacheableDependencyInterface {
     }
 
     $action->execute(array($entity));
+  }
+
+  /**
+   * Batch API callback: loads the view page by page and enqueues all items.
+   *
+   * @param $queue_name
+   *   The name of the queue to which the items should be added.
+   * @param $operation
+   *   The operation object.
+   * @param $options
+   *   An array of options that affect execution (revision, entity_load_capacity,
+   *   view_info). Passed along with each new queue item.
+   */
+  public function views_bulk_operations_adjust_selection($action_id, $all_pages) {
+    if (!isset($context['sandbox']['progress'])) {
+      $context['sandbox']['progress'] = 0;
+      $context['sandbox']['max'] = 0;
+    }
+
+    /** @var \Drupal\views\ViewExecutable $view */
+    $this->view->pager->hasMoreRecords();
+
+    $view = \Drupal\views\Views::getView($this->view->storage->id());
+    $view->setExposedInput($this->view->getExposedInput());
+    $view->setArguments($this->view->argument);
+    $view->setDisplay($view->current_display);
+    $view->setItemsPerPage(0);
+    $view->build();
+    $view->execute($view->current_display);
+    /*// Note the total number of rows.
+    if (empty($context['sandbox']['max'])) {
+      $context['sandbox']['max'] = $view->total_rows;
+      $context['sandbox']['rows'] = $view->result;
+    }*/
+    $user_id = \Drupal::currentUser()->id();
+    $revision_id = NULL;
+    foreach($view->result AS $row) {
+      $operations[] = array(array(__CLASS__, 'batchOperation'), array($action_id, $row->nid, $revision_id, $row->_entity->language()->getId(), $user_id));
+    }
+    return $operations;
   }
 }
 
